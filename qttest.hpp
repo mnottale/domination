@@ -58,11 +58,13 @@ class Game
 {
 public:
   Player* players[2];
-  void setup();
+  void setup(int w, int h);
   void run(QApplication& app);
   void showMenu(QWidget* widget, bool flip);
   void addBuilding(Building& b, int slot);
   QPixmap& getAsset(Asset asset, bool flip=false);
+  int w, h;
+  static const int buildingSize = 80;
 private:
   void loadAssets();
   std::vector<std::vector<QPixmap*>> _assetTextures;
