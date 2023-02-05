@@ -102,6 +102,139 @@ private:
   Callback _onClick;
 };
 
+class BuildingShipYard: public Building
+{
+public:
+  BuildingShipYard(Player& player)
+  : Building(player, Asset::BuildingBase)
+  {
+    graphics = new ClickablePixmap(game().getAsset(Asset::BuildingShipYard),
+      [this](){onClick();});
+  }
+  void make(QLayout* layout, Asset what)
+  {
+    auto* b = new ClickablePushButton([this, what] { enqueue(what);});
+    b->setIcon(QIcon(game().getAsset(what)));
+    b->setIconSize(QSize(Game::buildingSize/2, Game::buildingSize/2));
+    layout->addWidget(b);
+  }
+  void redrawQueue()
+  {
+    for (int i=0;i<_queue.size();++i)
+      _queueButtons[i]->setIcon(QIcon(game().getAsset(_queue[i])));
+    for (int i=_queue.size(); i<16;++i)
+      _queueButtons[i]->setIcon(QIcon::fromTheme("call-stop"));
+  }
+  void removeQueue(int pos)
+  {
+    if (pos >= _queue.size())
+      return;
+    _queue.erase(_queue.begin() + pos);
+    redrawQueue();
+  }
+  void startProducing(Asset what)
+  {
+    _producing = what;
+    _producingButton->setIcon(QIcon(game().getAsset(what)));
+    _productionStart = now();
+    _timer = new QTimer();
+    _timer->connect(_timer, &QTimer::timeout,
+      std::bind(&BuildingShipYard::updateProduction, this));
+    _timer->start(50);
+  }
+  void updateProduction()
+  {
+    auto elapsed = now() - _productionStart;
+    typedef std::chrono::duration<float> float_seconds;
+    auto secs = std::chrono::duration_cast<float_seconds>(elapsed).count();
+    if (elapsed > std::chrono::seconds(10))
+    {
+      player().placeShip(_producing);
+      _progress->setValue(0);
+      if (_queue.empty())
+      {
+        _producingButton->setIcon(QIcon::fromTheme("call-stop"));
+        _timer->stop();
+        delete _timer;
+        _timer = nullptr;
+        _producing = Asset::AssetEnd;
+      }
+      else
+      {
+        _producing = _queue.front();
+        _producingButton->setIcon(QIcon(game().getAsset(_producing)));
+        _queue.erase(_queue.begin());
+        _productionStart = now();
+        redrawQueue();
+      }
+    }
+    else
+    {
+      _progress->setValue(secs * 1000.0 / 10.0);
+    }
+  }
+  void enqueue(Asset what)
+  {
+    if (_producing == Asset::AssetEnd)
+      startProducing(what);
+    else if (_queue.size() < 16)
+    {
+      _queue.push_back(what);
+      _queueButtons[_queue.size()-1]->setIcon(QIcon(game().getAsset(what)));
+    }
+  }
+  void onClick()
+  {
+    if (menu == nullptr)
+    {
+      QGroupBox *groupBox = new QGroupBox("Ship Yard");
+      QBoxLayout *layout = new QBoxLayout(QBoxLayout::TopToBottom);
+      layout->addWidget(new QLabel("currently producing"));
+      QPushButton *button = new QPushButton;
+      button->setIcon(QIcon::fromTheme("call-stop"));
+      button->setIconSize(QSize(Game::buildingSize/2, Game::buildingSize/2));
+      layout->addWidget(button);
+      _producingButton = button;
+      auto* bar = new QProgressBar();
+      bar->setMinimum(0);
+      bar->setMaximum(1000);
+      layout->addWidget(bar);
+      _progress = bar;
+      layout->addWidget(new QLabel("start production:"));
+      auto* l = new QBoxLayout(QBoxLayout::LeftToRight);
+      make(l, Asset::ShipFighter);
+      make(l, Asset::ShipFrigate);
+      make(l, Asset::ShipCruiser);
+      layout->addLayout(l);
+      layout->addWidget(new QLabel("production queue"));
+      for (int y=0;y<4;++y)
+      {
+        l = new QBoxLayout(QBoxLayout::LeftToRight);
+        for (int x=0;x<4;++x)
+        {
+          auto* b = new ClickablePushButton([this, pos=x+y*4] { removeQueue(pos);});
+          b->setIcon(QIcon::fromTheme("call-stop"));
+          b->setIconSize(QSize(Game::buildingSize/2, Game::buildingSize/2));
+          _queueButtons.push_back(b);
+          l->addWidget(b);
+        }
+        layout->addLayout(l);
+      }
+      groupBox->setLayout(layout);
+      menu = groupBox;
+    }
+    _player.showMenu(menu);
+  }
+private:
+  QWidget* menu = nullptr;
+  Asset _producing = Asset::AssetEnd;
+  QPushButton* _producingButton;
+  QProgressBar* _progress;
+  QTimer* _timer = nullptr;
+  Time _productionStart;
+  std::vector<Asset> _queue;
+  std::vector<QPushButton*> _queueButtons;
+};
 class BuildingBase: public Building
 {
 public:
@@ -219,6 +352,9 @@ void Player::placeBuilding(Asset type)
   case Asset::BuildingBase:
     b = new BuildingBase(*this);
     break;
+  case Asset::BuildingShipYard:
+    b = new BuildingShipYard(*this);
+    break;
   default:
     throw std::runtime_error("cannot build this");
   }
@@ -226,6 +362,14 @@ void Player::placeBuilding(Asset type)
   _game.addBuilding(*b, _buildings.size()-1);
 }
 
+void Player::placeShip(Asset type)
+{
+  auto s = std::make_shared<Ship>(game().config.ships[(int)type-(int)Asset::ShipFighter],
+    *this, type,
+    P2{game().w/2 + (rand()%50)-25, _flip? 120 : game().h - 120}
+    );
+  _game.addShip(s);
+}
 static std::string assetName[] = {
   "ship_fighter*.png",
   "ship_frigate*.png",
@@ -267,6 +411,15 @@ QPixmap& Game::getAsset(Asset asset, bool flip)
 
 void Game::setup(int w, int h)
 {
+  config = Config
+  {
+    {//time accel  speed aspd  hp     dmg  asopt asmax
+      {  8.0, 20.0, 60.0, 1.2,  30.0, 1.0, 2.0, 4.0 },
+      { 19.5, 15.0, 40.0, 1.0,  60.0, 1.0, 1.5, 3.0 },
+      { 38.0, 15.0, 30.0, 0.8, 120.0, 1.0, 0.2, 0.8 },
+    },
+    200.0
+  };
   this->w = w;
   this->h = h;
   loadAssets();
@@ -281,7 +434,74 @@ void Game::run(QApplication& app)
 {
   QGraphicsView view(&_scene);
   view.show();
+  auto* t = new QTimer();
+  t->connect(t, &QTimer::timeout,
+      std::bind(&Game::update, this));
+  t->start(50);
+  _lastUpdate = now();
   app.exec();
+}
+
+Player& Game::otherPlayer(Player const& p)
+{
+  if (&p == players[0])
+    return *players[1];
+  else
+    return *players[0];
+}
+void Game::update()
+{
+  auto delapsed = now() - _lastUpdate;
+  typedef std::chrono::duration<float> float_seconds;
+  auto elapsed = std::chrono::duration_cast<float_seconds>(delapsed).count();
+  _lastUpdate = now();
+  for (auto& sptr: _ships)
+  {
+    auto& s = *sptr;
+    s.think(_ships, otherPlayer(s.player).buildings());
+    s.rotation += s.angularSpeed * elapsed;
+    s.speed.x += elapsed * s.acceleration * sin(s.rotation) * -1.0;
+    s.speed.y += elapsed * s.acceleration * cos(s.rotation) * -1.0;
+    float smag = s.speed.length();
+    P2 snorm = s.speed.normalize();
+    smag -= sgn(smag) * std::min((double)smag, elapsed * 10.0);
+    s.speed = snorm * smag;
+    //s.speed.x -= sgn(s.speed.x) * std::min((double)fabs(s.speed.x), elapsed * 10.0);
+    //s.speed.y -= sgn(s.speed.y) * std::min((double)fabs(s.speed.y), elapsed * 10.0);
+    s.position.x += s.speed.x * elapsed;
+    s.position.y += s.speed.y * elapsed;
+    s.pix->setPos(s.position.x, s.position.y);
+    s.pix->setRotation(s.rotation * 180.0 / 3.14159);
+    // shots timeout/out of range
+    for (int i=0; i< s.shots.size(); ++i)
+    {
+      auto& shot = s.shots[i];
+      P2 targetPos = shot.targetShip ? shot.targetShip->position : shot.targetBuilding->center;   
+      if (now() - shot.start > std::chrono::seconds(1)
+        || (targetPos-s.absolute(Ship::weaponLocations[s.typeIndex()][shot.slot])).length() > 70.0)
+      {
+        std::swap(s.shots[i], s.shots[s.shots.size()-1]);
+        s.shots.pop_back();
+      }
+      else if (shot.hit)
+      { // deal damage
+        if (shot.targetShip)
+          shot.targetShip->hp -= elapsed * s.config.damage;
+        else
+          shot.targetBuilding->hp -= elapsed * s.config.damage;
+      }
+    }
+  }
+  // remove dead ships
+  for (int i=0; i<_ships.size(); ++i)
+  {
+    if (_ships[i]->hp <= 0.0)
+    {
+      _scene.removeItem(_ships[i]->pix);
+      std::swap(_ships[i], _ships[_ships.size()-1]);
+      _ships.pop_back(); // todo: dramatic explosion
+    }
+  }
 }
 
 void Game::addBuilding(Building& b, int slot)
@@ -293,9 +513,19 @@ void Game::addBuilding(Building& b, int slot)
   {
     item->setRotation(180);
     item->setPos(h-buildingSize*slot, buildingSize);
+    b.center = P2{h-buildingSize*slot-buildingSize/2, buildingSize/2};
   }
   else
+  {
     item->setPos(buildingSize*slot, h-buildingSize);
+    b.center = P2{buildingSize*slot+buildingSize/2, h-buildingSize/2};
+  }
+}
+
+void Game::addShip(ShipPtr ship)
+{
+  _ships.push_back(ship);
+  _scene.addItem(ship->pix);
 }
 
 void Game::showMenu(QWidget* widget, bool flip)
@@ -318,3 +548,41 @@ void Game::showMenu(QWidget* widget, bool flip)
     _menus[idx]->setPos(h, h-widget->height());
   }
 }
+
+Ship::Ship(ShipConfig const& config, Player& p, Asset st, P2 pos)
+: position(pos), shipType(st), player(p), config(config)
+{
+  hp = config.hp;
+  patrolPoint = destination + P2{rand()%160-80, rand()%160-80};
+  pix = new QGraphicsPixmapItem(p.game().getAsset(st, p.flip()));
+}
+
+int Ship::freeWeaponSlots()
+{
+  int res = (1 << (weaponLocations[typeIndex()].size()+1)) - 1;
+  for (auto const& s: shots)
+    res &= ~ (1 << s.slot);
+  return res;
+}
+int Ship::freeWeaponSlot()
+{
+  std::vector<bool> isBusy;
+  isBusy.resize(weaponLocations[typeIndex()].size());
+  for (auto const& s: shots)
+    isBusy[s.slot] = true;
+  return std::find(isBusy.begin(), isBusy.end(), false) - isBusy.begin();
+}
+
+P2 Ship::absolute(P2 pointOnShip)
+{
+  auto a = atan2(-pointOnShip.y, pointOnShip.x)-M_PI/2.0;
+  auto len = pointOnShip.length();
+  auto aa = a + rotation;
+  return P2 { position.x + len * sin(aa), position.y + len * cos(aa)};
+}
+
+std::vector<std::vector<P2>> Ship::weaponLocations = {
+{{0, -5}},
+{{-8, -4}, {8, -4}},
+{{-20, -11}, {20, -11}, {-20, 7}, { 20, 7}}
+};
