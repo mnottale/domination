@@ -427,7 +427,11 @@ void Game::setup(int w, int h)
   players[1] = new Player(*this, true);
   players[0]->placeBuilding(Asset::BuildingBase);
   players[1]->placeBuilding(Asset::BuildingBase);
+  players[0]->placeBuilding(Asset::BuildingShipYard);
+  players[1]->placeBuilding(Asset::BuildingShipYard);
   _scene.addLine(h, 0, h, h);
+  _scene.setBackgroundBrush(QBrush(Qt::black));
+  //_scene.addRect(0, 0, h, h, QPen(), QBrush(Qt::black));
 }
 
 void Game::run(QApplication& app)
@@ -470,8 +474,12 @@ void Game::update()
     //s.speed.y -= sgn(s.speed.y) * std::min((double)fabs(s.speed.y), elapsed * 10.0);
     s.position.x += s.speed.x * elapsed;
     s.position.y += s.speed.y * elapsed;
-    s.pix->setPos(s.position.x, s.position.y);
-    s.pix->setRotation(s.rotation * 180.0 / 3.14159);
+    auto asz = assetSize[(int)s.shipType];
+    auto d = (double)asz * sqrt(2.0) / 2.0;
+    auto dx = d * sin(s.rotation + M_PI / 4.0);
+    auto dy = d * cos(s.rotation + M_PI / 4.0);
+    s.pix->setPos(s.position.x-dx, s.position.y-dy);
+    s.pix->setRotation(-s.rotation * 180.0 / M_PI);
     // shots timeout/out of range
     for (int i=0; i< s.shots.size(); ++i)
     {
@@ -480,15 +488,29 @@ void Game::update()
       if (now() - shot.start > std::chrono::seconds(1)
         || (targetPos-s.absolute(Ship::weaponLocations[s.typeIndex()][shot.slot])).length() > 70.0)
       {
+        scene().removeItem(shot.pix);
+        delete shot.pix;
         std::swap(s.shots[i], s.shots[s.shots.size()-1]);
         s.shots.pop_back();
       }
-      else if (shot.hit)
-      { // deal damage
+      else 
+      {
+        if (shot.hit)
+        { // deal damage
+          if (shot.targetShip)
+            shot.targetShip->hp -= elapsed * s.config.damage;
+          else
+            shot.targetBuilding->hp -= elapsed * s.config.damage;
+        }
+        // draw shot
+        P2 hl;
         if (shot.targetShip)
-          shot.targetShip->hp -= elapsed * s.config.damage;
+          hl = shot.targetShip->absolute(shot.hitLocation);
         else
-          shot.targetBuilding->hp -= elapsed * s.config.damage;
+          hl = shot.targetBuilding->center + shot.hitLocation;
+        P2 sl = Ship::weaponLocations[s.typeIndex()][shot.slot];
+        sl = s.absolute(sl);
+        shot.pix->setLine(hl.x, hl.y, sl.x, sl.y);
       }
     }
   }
@@ -497,6 +519,11 @@ void Game::update()
   {
     if (_ships[i]->hp <= 0.0)
     {
+      for (auto& shot: _ships[i]->shots)
+      {
+        _scene.removeItem(shot.pix);
+        delete shot.pix;
+      }
       _scene.removeItem(_ships[i]->pix);
       std::swap(_ships[i], _ships[_ships.size()-1]);
       _ships.pop_back(); // todo: dramatic explosion

@@ -73,6 +73,7 @@ public:
   P2 hitLocation;
   Time start;
   bool hit;
+  QGraphicsLineItem* pix;
 };
 
 struct ShipConfig
@@ -146,6 +147,7 @@ public:
   Config config;
   QGraphicsScene& scene() { return _scene;}
   static const int buildingSize = 80;
+  static const constexpr int assetSize[10] = {15, 30, 50, 80, 80, 80, 80, 80, 80, 80};
 private:
   void loadAssets();
   std::vector<std::vector<QPixmap*>> _assetTextures;

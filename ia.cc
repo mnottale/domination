@@ -73,6 +73,13 @@ void Ship::fireAt(ShipPtr target, int weaponSlot)
     shots.push_back(Laser{weaponSlot, target, nullptr, randomHitLocation(*target), now(), true});
   else
     shots.push_back(Laser{weaponSlot, target, nullptr, randomHitLocation(*target), now(), false});
+  shots.back().pix = new QGraphicsLineItem();
+  shots.back().pix->setPen(QPen(
+    hit?
+       (player.flip()? QColor(70, 70, 255) : QColor(255, 255, 70))
+       :(player.flip()? QColor(100, 100, 140) : QColor(140, 100, 100))
+    ));
+  player.game().scene().addItem(shots.back().pix);
   //player.screen().recordShot(typeIndex(), hit);
 }
 
@@ -132,6 +139,8 @@ void Ship::think(std::vector<ShipPtr> const& ships, std::vector<Building*> const
         if ((awl-b->center).length() < 60.0)
         {
           shots.push_back(Laser{shift, nullptr, b, randomBuildingHitLocation(), now()});
+          shots.back().pix = new QGraphicsLineItem();
+          player.game().scene().addItem(shots.back().pix);
           break;
         }
       }
