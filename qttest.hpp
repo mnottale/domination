@@ -21,9 +21,9 @@ enum class Asset
   ShipCruiser,
   BuildingBase,
   BuildingTurret,
-  BuildingPowerGenerator,
   BuildingMissileLauncher,
   BuildingShipYard,
+  BuildingPowerGenerator,
   AssetEnd,
 };
 class Player;

@@ -4,6 +4,7 @@
 #include <QGraphicsView>
 #include <QGraphicsProxyWidget>
 #include <QGroupBox>
+#include <QSlider>
 #include <QPushButton>
 #include <QTimer>
 #include <QProgressBar>
@@ -102,11 +103,73 @@ private:
   Callback _onClick;
 };
 
+class BuildingPowerGenerator: public Building
+{
+public:
+  BuildingPowerGenerator(Player& player)
+  : Building(player, Asset::BuildingPowerGenerator)
+  {
+    graphics = new ClickablePixmap(game().getAsset(Asset::BuildingPowerGenerator),
+      [this](){onClick();});
+  }
+  void onClick()
+  {
+    if (menu == nullptr)
+    {
+      constexpr const char* bn[] = {"Base", "Turr", "Miss", "Ship"};
+      QGroupBox *groupBox = new QGroupBox("Power Generator");
+      auto *layout = new QGridLayout();
+      for (int i=0;i<4;i++)
+      {
+        auto* s = new QSlider(Qt::Vertical);
+        _sliders[i] = s;
+        s->setMaximum(100);
+        s->setMinimum(0);
+        s->setValue(25);
+        s->connect(s, &QSlider::valueChanged,
+          std::bind(&BuildingPowerGenerator::sliderChange, this, i, std::placeholders::_1));
+        layout->addWidget(s, 0, i);
+        layout->addWidget(new QLabel(bn[i]), 1, i);
+      }
+      groupBox->setLayout(layout);
+      menu = groupBox;
+    }
+     _player.showMenu(menu);
+  }
+  void sliderChange(int idx, int value)
+  {
+    if (_nested)
+      return;
+    int rest = 0;
+    for (int i=0;i<4;i++)
+    {
+      if (i != idx)
+        rest += _sliders[i]->value();
+    }
+    if (rest + value != 100)
+    {
+      if (rest == 0)
+        rest = 1;
+      double factor = (double)(100-value) / (double)rest;
+      _nested = true;
+      for (int i=0;i<4;i++)
+      {
+        if (i != idx)
+          _sliders[i]->setValue(_sliders[i]->value() * factor);
+      }
+      _nested = false;
+    }
+  }
+private:
+  QWidget* menu = nullptr;
+  QSlider * _sliders[4];
+  bool _nested = false;
+};
 class BuildingShipYard: public Building
 {
 public:
   BuildingShipYard(Player& player)
-  : Building(player, Asset::BuildingBase)
+  : Building(player, Asset::BuildingShipYard)
   {
     graphics = new ClickablePixmap(game().getAsset(Asset::BuildingShipYard),
       [this](){onClick();});
@@ -481,6 +544,9 @@ void Player::placeBuilding(Asset type)
   case Asset::BuildingShipYard:
     b = new BuildingShipYard(*this);
     break;
+  case Asset::BuildingPowerGenerator:
+    b = new BuildingPowerGenerator(*this);
+    break;
   default:
     throw std::runtime_error("cannot build this");
   }
@@ -502,9 +568,9 @@ static std::string assetName[] = {
   "ship_cruiser*.png",
   "building_base.png",
   "building_turret.png",
-  "building_powergenerator.png",
   "building_missilelauncher.png",
-  "building_shipyard.png"
+  "building_shipyard.png",
+  "building_powergenerator.png",
 };
 void Game::loadAssets()
 {
