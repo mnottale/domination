@@ -53,12 +53,19 @@ public:
   void placeShip(Asset type);
   bool flip() { return _flip;}
   void showMenu(QWidget* widget);
+  void showPlayerMenu();
+  void moveShips(int to);
   Game& game() { return _game;}
   const std::vector<Building*> buildings() { return _buildings;}
 protected:
   Game& _game;
   std::vector<Building*> _buildings;
   bool _flip;
+  QWidget* _menu = nullptr;
+  QWidget* _current = nullptr;
+  QPushButton* _kinds[3];
+  std::vector<std::vector<QPushButton*>> _zones;
+  QTabWidget* _tabs;
 };
 
 class Ship;
@@ -143,6 +150,7 @@ public:
   void addShip(ShipPtr ship);
   Player& otherPlayer(Player const& p);
   QPixmap& getAsset(Asset asset, bool flip=false);
+  std::vector<ShipPtr> ships() { return _ships;}
   int w, h;
   Config config;
   QGraphicsScene& scene() { return _scene;}

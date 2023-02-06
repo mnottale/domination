@@ -147,7 +147,8 @@ public:
     auto elapsed = now() - _productionStart;
     typedef std::chrono::duration<float> float_seconds;
     auto secs = std::chrono::duration_cast<float_seconds>(elapsed).count();
-    if (elapsed > std::chrono::seconds(10))
+    auto buildTime = game().config.ships[(int)_producing].buildTime;
+    if (secs > buildTime)
     {
       player().placeShip(_producing);
       _progress->setValue(0);
@@ -170,7 +171,7 @@ public:
     }
     else
     {
-      _progress->setValue(secs * 1000.0 / 10.0);
+      _progress->setValue(secs * 1000.0 / buildTime);
     }
   }
   void enqueue(Asset what)
@@ -341,7 +342,132 @@ Game& Building::game() {return _player.game();}
 
 void Player::showMenu(QWidget* widget)
 {
-  _game.showMenu(widget, _flip);
+  if (_current == widget)
+  {
+    showPlayerMenu();
+  }
+  else
+  {
+    _current = widget;
+    _game.showMenu(widget, _flip);
+  }
+}
+
+void Player::showPlayerMenu()
+{
+  if (_menu == nullptr)
+  {
+    QGroupBox *groupBox = new QGroupBox("Move ships");
+    QBoxLayout *layout = new QBoxLayout(QBoxLayout::TopToBottom);
+    //layout->addWidget(new QLabel("kind filter"));
+    auto* l = new QBoxLayout(QBoxLayout::LeftToRight);
+    for (int i=0; i<3;i++)
+    {
+      auto* b = new QPushButton();
+      b->setIcon(QIcon(game().getAsset((Asset)i)));
+      b->setIconSize(QSize(Game::buildingSize/2, Game::buildingSize/2));
+      b->setCheckable(true);
+      _kinds[i] = b;
+      l->addWidget(b);
+    }
+    layout->addLayout(l);
+    //layout->addWidget(new QLabel("zone filter"));
+    auto* tw = new QTabWidget();
+    tw->setMaximumWidth(200);
+    tw->addTab(new QLabel("EVERYWHERE"), "all");
+    for (int s=2; s <6; ++s)
+    {
+      _zones.emplace_back();
+      auto* quad = new QGroupBox("");
+      quad->setMaximumWidth(180);
+      auto* ql = new QGridLayout();
+      ql->setHorizontalSpacing(1);
+      ql->setVerticalSpacing(1);
+      for (int i=0; i <s*s;++i)
+      {
+        auto* b = new QPushButton("x");
+        b->setMinimumWidth(20);
+        b->setMinimumHeight(20);
+        b->setMaximumHeight(100);
+        //b->setMaximumWidth(20);
+        b->setCheckable(true);
+        ql->addWidget(b, i%s, i/s);
+        _zones[s-2].push_back(b);
+      }
+      quad->setLayout(ql);
+      tw->addTab(quad, std::to_string(s).c_str());
+    }
+    _tabs = tw;
+    layout->addWidget(tw);
+    //layout->addWidget(new QLabel("move to"));
+    auto* quad = new QGroupBox("");
+    quad->setMaximumWidth(180);
+    auto* ql = new QGridLayout();
+    ql->setHorizontalSpacing(1);
+    ql->setVerticalSpacing(1);
+    const int SZ = 5;
+    for (int i=0; i <SZ*SZ;++i)
+    {
+      auto* b = new ClickablePushButton([this, idx=i]{moveShips(idx);});
+      b->setText("x");
+      b->setMinimumWidth(20);
+      b->setMinimumHeight(20);
+      b->setMaximumHeight(100);
+      ql->addWidget(b, i%SZ, i/SZ);
+    }
+    quad->setLayout(ql);
+    layout->addWidget(quad);
+    groupBox->setLayout(layout);
+    _menu = groupBox;
+  }
+  _current = nullptr;
+  _game.showMenu(_menu, _flip);
+}
+double clamp(double v, double min, double max)
+{
+  if (v < min)
+    return min;
+  if (v > max)
+    return max;
+  return v;
+}
+
+void Player::moveShips(int to)
+{
+  double gh = game().h;
+  double tx = ((double)(to/5) + 0.5)/6.0 * gh;
+  double ty = ((double)(to%5) + 0.5)/6.0 * gh;
+  if (_flip)
+  {
+    tx = game().h-tx;
+    ty = game().h-ty;
+  }
+  P2 tgt{tx,ty};
+  auto ti = _tabs->currentIndex();
+  auto* z = ti == 0 ? nullptr: &_zones[ti-1];
+  double zc = ti+1;
+  for (auto& s: game().ships())
+  {
+    if (&s->player != this)
+      continue;
+    if (!_kinds[(int)s->shipType]->isChecked())
+      continue;
+    if (ti == 0)
+    {
+      s->setDestination(tgt);
+      continue;
+    }
+    int ix = clamp(s->position.x, 0, gh-1) / gh * zc;
+    int iy = clamp(s->position.y, 0, gh-1) / gh * zc;
+    if (_flip)
+    {
+      ix = zc-ix-1;
+      iy = zc-iy-1;
+    }
+    if (!(*z)[ix*zc+iy]->isChecked())
+      continue;
+    s->setDestination(tgt);
+  }
 }
 
 void Player::placeBuilding(Asset type)
@@ -366,7 +492,7 @@ void Player::placeShip(Asset type)
 {
   auto s = std::make_shared<Ship>(game().config.ships[(int)type-(int)Asset::ShipFighter],
     *this, type,
-    P2{game().w/2 + (rand()%50)-25, _flip? 120 : game().h - 120}
+    P2{game().h/2 + (rand()%50)-25, _flip? 120 : game().h - 120}
     );
   _game.addShip(s);
 }
