@@ -2,6 +2,8 @@
 #include <QGraphicsItem>
 #include <QWidget>
 #include <QPixmap>
+#include <QPushButton>
+#include <QTabWidget>
 #include <functional>
 #include <memory>
 #include <chrono>
@@ -42,6 +44,7 @@ public:
   double hp = 200.0;
   double hpMax = 200.0;
   QGraphicsItem* graphics;
+  QGraphicsRectItem* healthBar;
   Player& player() {return _player;}
   Game& game();
   P2 center;

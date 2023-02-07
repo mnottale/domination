@@ -12,6 +12,8 @@
 #include <QFormLayout>
 #include <QLineEdit>
 
+#include <set>
+
 #include "qttest.hpp"
 
 Time now()
@@ -684,6 +686,7 @@ void Game::update()
   typedef std::chrono::duration<float> float_seconds;
   auto elapsed = std::chrono::duration_cast<float_seconds>(delapsed).count();
   _lastUpdate = now();
+  std::set<Building*> hitBuilding;
   for (auto& sptr: _ships)
   {
     auto& s = *sptr;
@@ -725,7 +728,10 @@ void Game::update()
           if (shot.targetShip)
             shot.targetShip->hp -= elapsed * s.config.damage;
           else
+          {
             shot.targetBuilding->hp -= elapsed * s.config.damage;
+            hitBuilding.insert(shot.targetBuilding);
+          }
         }
         // draw shot
         P2 hl;
@@ -737,6 +743,16 @@ void Game::update()
         sl = s.absolute(sl);
         shot.pix->setLine(hl.x, hl.y, sl.x, sl.y);
       }
+    }
+  }
+  // update building hp
+  for(auto* b: hitBuilding)
+  {
+    b->healthBar->setRect(0,0,b->hp/b->hpMax * (double)buildingSize, 4);
+    if (b->hp <= 0)
+    {
+      _scene.removeItem(b->graphics);
+      _scene.removeItem(b->healthBar);
     }
   }
   // remove dead ships
@@ -760,17 +776,23 @@ void Game::addBuilding(Building& b, int slot)
 {
   bool flip = b.player().flip();
   auto item = b.graphics;
+  b.healthBar = new QGraphicsRectItem(0, 0, buildingSize, 4);
+  b.healthBar->setBrush(QBrush(Qt::green));
   _scene.addItem(item);
+  _scene.addItem(b.healthBar);
   if (flip)
   {
     item->setRotation(180);
-    item->setPos(h-buildingSize*slot, buildingSize);
+    item->setPos(h-buildingSize*slot, buildingSize+4);
     b.center = P2{h-buildingSize*slot-buildingSize/2, buildingSize/2};
+    b.healthBar->setRotation(180);
+    b.healthBar->setPos(h-buildingSize*slot, 4);
   }
   else
   {
     item->setPos(buildingSize*slot, h-buildingSize);
     b.center = P2{buildingSize*slot+buildingSize/2, h-buildingSize/2};
+    b.healthBar->setPos(buildingSize*slot, h-4);
   }
 }
 
