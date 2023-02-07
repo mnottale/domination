@@ -138,7 +138,7 @@ void Ship::think(std::vector<ShipPtr> const& ships, std::vector<Building*> const
         auto awl = absolute(wl);
         if ((awl-b->center).length() < 60.0)
         {
-          shots.push_back(Laser{shift, nullptr, b, randomBuildingHitLocation(), now()});
+          shots.push_back(Laser{shift, nullptr, b, randomBuildingHitLocation(), now(), true});
           shots.back().pix = new QGraphicsLineItem();
           player.game().scene().addItem(shots.back().pix);
           break;

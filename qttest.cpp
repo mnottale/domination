@@ -103,16 +103,38 @@ private:
   Callback _onClick;
 };
 
-class BuildingPowerGenerator: public Building
+class BuildingCore: public Building
+{
+public:
+  BuildingCore(Player& player, Asset type)
+  :Building(player, type)
+  {
+    graphics = new ClickablePixmap(game().getAsset(type),
+      [this](){show();});
+  }
+  void show()
+  {
+    // redirect click to first instance
+    for(auto* b: player().buildings())
+    {
+      if (b->assetType() == assetType())
+      {
+        static_cast<BuildingCore*>(b)->onClick();
+        break;
+      }
+    }
+  }
+  virtual void onClick() = 0;
+};
+
+class BuildingPowerGenerator: public BuildingCore
 {
 public:
   BuildingPowerGenerator(Player& player)
-  : Building(player, Asset::BuildingPowerGenerator)
+  : BuildingCore(player, Asset::BuildingPowerGenerator)
   {
-    graphics = new ClickablePixmap(game().getAsset(Asset::BuildingPowerGenerator),
-      [this](){onClick();});
   }
-  void onClick()
+  void onClick() override
   {
     if (menu == nullptr)
     {
@@ -159,10 +181,12 @@ public:
       }
       _nested = false;
     }
+    int bidx = buildingIndex(Asset::BuildingPowerGenerator);
+    double factor = pow(1.0+ game().config.dupBonuses[bidx], player().countOf[bidx]-1);
     for (int i=0;i<4;i++)
     {
       double raw = (double)_sliders[i]->value() / 100.0;
-      double bonus = raw * game().config.powerBonuses[i];
+      double bonus = raw * game().config.powerBonuses[i] * factor;
       player().powerFactors[i] = 1.0 - bonus;
     }
   }
@@ -171,14 +195,12 @@ private:
   QSlider * _sliders[4];
   bool _nested = false;
 };
-class BuildingShipYard: public Building
+class BuildingShipYard: public BuildingCore
 {
 public:
   BuildingShipYard(Player& player)
-  : Building(player, Asset::BuildingShipYard)
+  : BuildingCore(player, Asset::BuildingShipYard)
   {
-    graphics = new ClickablePixmap(game().getAsset(Asset::BuildingShipYard),
-      [this](){onClick();});
   }
   void make(QLayout* layout, Asset what)
   {
@@ -215,8 +237,11 @@ public:
   {
     auto elapsed = now() - _productionStart;
     typedef std::chrono::duration<float> float_seconds;
-    auto secs = std::chrono::duration_cast<float_seconds>(elapsed).count() ;
-    auto buildTime = game().config.ships[(int)_producing].buildTime * player().powerFactors[buildingIndex(Asset::BuildingShipYard)];
+    auto secs = std::chrono::duration_cast<float_seconds>(elapsed).count();
+    int bidx = buildingIndex(Asset::BuildingShipYard);
+    auto buildTime = game().config.ships[(int)_producing].buildTime
+     * player().powerFactors[bidx]
+     * pow(1.0 - game().config.dupBonuses[bidx], player().countOf[bidx]-1);
     if (secs > buildTime)
     {
       player().placeShip(_producing);
@@ -253,7 +278,7 @@ public:
       _queueButtons[_queue.size()-1]->setIcon(QIcon(game().getAsset(what)));
     }
   }
-  void onClick()
+  void onClick() override
   {
     if (menu == nullptr)
     {
@@ -305,14 +330,12 @@ private:
   std::vector<Asset> _queue;
   std::vector<QPushButton*> _queueButtons;
 };
-class BuildingBase: public Building
+class BuildingBase: public BuildingCore
 {
 public:
   BuildingBase(Player& player)
-  : Building(player, Asset::BuildingBase)
+  : BuildingCore(player, Asset::BuildingBase)
   {
-    graphics = new ClickablePixmap(game().getAsset(Asset::BuildingBase),
-      [this](){onClick();});
   }
   void updateProduction()
   {
@@ -356,7 +379,7 @@ public:
     b->setIconSize(QSize(Game::buildingSize/2, Game::buildingSize/2));
     layout->addWidget(b);
   }
-  void onClick()
+  void onClick() override
   {
     if (menu == nullptr)
     {
@@ -558,6 +581,7 @@ void Player::placeBuilding(Asset type)
   }
   _buildings.push_back(b);
   _game.addBuilding(*b, _buildings.size()-1);
+  countOf[buildingIndex(type)]++;
 }
 
 void Player::placeShip(Asset type)
@@ -617,7 +641,9 @@ void Game::setup(int w, int h)
       { 38.0, 15.0, 30.0, 0.8, 120.0, 1.0, 0.2, 0.8 },
     },
     200.0,
-    {0.2, 0.3, 0.3, 0.2}
+    //bas turr miss ship powr
+    {0.2, 0.3, 0.3, 0.2}, //power factory bonuses
+    {0.3, 0.4, 0.4, 0.3, 0.3}, // dup bonuses
   };
   this->w = w;
   this->h = h;

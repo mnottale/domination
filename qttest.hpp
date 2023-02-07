@@ -64,6 +64,7 @@ public:
   Game& game() { return _game;}
   const std::vector<Building*> buildings() { return _buildings;}
   double powerFactors[4] = {1,1,1,1};
+  int countOf[5] = {0,0,0,0,0};
 protected:
   Game& _game;
   std::vector<Building*> _buildings;
@@ -143,6 +144,7 @@ struct Config
   ShipConfig ships[3];
   double buildingHp;
   double powerBonuses[4];
+  double dupBonuses[5];
 };
 
 
