@@ -159,6 +159,12 @@ public:
       }
       _nested = false;
     }
+    for (int i=0;i<4;i++)
+    {
+      double raw = (double)_sliders[i]->value() / 100.0;
+      double bonus = raw * game().config.powerBonuses[i];
+      player().powerFactors[i] = 1.0 - bonus;
+    }
   }
 private:
   QWidget* menu = nullptr;
@@ -209,8 +215,8 @@ public:
   {
     auto elapsed = now() - _productionStart;
     typedef std::chrono::duration<float> float_seconds;
-    auto secs = std::chrono::duration_cast<float_seconds>(elapsed).count();
-    auto buildTime = game().config.ships[(int)_producing].buildTime;
+    auto secs = std::chrono::duration_cast<float_seconds>(elapsed).count() ;
+    auto buildTime = game().config.ships[(int)_producing].buildTime * player().powerFactors[buildingIndex(Asset::BuildingShipYard)];
     if (secs > buildTime)
     {
       player().placeShip(_producing);
@@ -610,7 +616,8 @@ void Game::setup(int w, int h)
       { 19.5, 15.0, 40.0, 1.0,  60.0, 1.0, 1.5, 3.0 },
       { 38.0, 15.0, 30.0, 0.8, 120.0, 1.0, 0.2, 0.8 },
     },
-    200.0
+    200.0,
+    {0.2, 0.3, 0.3, 0.2}
   };
   this->w = w;
   this->h = h;

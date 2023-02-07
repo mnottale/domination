@@ -26,6 +26,12 @@ enum class Asset
   BuildingPowerGenerator,
   AssetEnd,
 };
+
+inline int buildingIndex(Asset a)
+{
+  return (int)a - (int)Asset::BuildingBase;
+}
+
 class Player;
 class Game;
 class Building
@@ -57,6 +63,7 @@ public:
   void moveShips(int to);
   Game& game() { return _game;}
   const std::vector<Building*> buildings() { return _buildings;}
+  double powerFactors[4] = {1,1,1,1};
 protected:
   Game& _game;
   std::vector<Building*> _buildings;
@@ -135,6 +142,7 @@ struct Config
 {
   ShipConfig ships[3];
   double buildingHp;
+  double powerBonuses[4];
 };
 
 
