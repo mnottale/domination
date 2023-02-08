@@ -136,6 +136,10 @@ public:
   : BuildingCore(player, Asset::BuildingTurret)
   {
     weaponConfig = game().config.turret;
+    _timer = new QTimer();
+    _timer->connect(_timer, &QTimer::timeout,
+      std::bind(&BuildingTurret::updateBonus, this));
+    _timer->start(500);
   }
   void onClick() override
   {
@@ -145,13 +149,28 @@ public:
     weapon = std::make_shared<Ship>(weaponConfig, player(), Asset::ShipFighter, center);
     game().addShip(weapon);
   }
+  void updateBonus()
+  {
+    double pwr = 1.0 - player().powerFactors[buildingIndex(Asset::BuildingTurret)];
+    pwr /= (double)player().countOf[buildingIndex(Asset::BuildingTurret)];
+    double wd = game().config.turret.damage * (1.0 + pwr);
+    if (prevWD != wd)
+    {
+      std::cerr << "turret damage " << prevWD << " -> " << wd << std::endl;
+      weaponConfig.damage = wd;
+      prevWD = wd;
+    }
+  }
   void destroyed() override
   {
     game().ships().erase(std::find(game().ships().begin(), game().ships().end(), weapon));
+    _timer->stop();
   }
 private:
+  double prevWD = 0;
   ShipConfig weaponConfig;
   ShipPtr weapon;
+  QTimer* _timer;
 };
 class BuildingPowerGenerator: public BuildingCore
 {
