@@ -90,27 +90,29 @@ void Ship::think(std::vector<ShipPtr> const& ships, std::vector<Building*> const
     P2 delta{rand()%160-80, rand()%160-80};
     patrolPoint = destination - delta;
   }
-  P2 v = patrolPoint - position;
-  double abadrep = atan2(-v.y, v.x); // reversed referrential, 0 is up-left
-  double a = simpleAngle(abadrep-M_PI/2.0);
-  double aSpeed = simpleAngle(atan2(-speed.y, speed.x)-M_PI/2.0);
-  
-  double da = deltaAngle(rotation, a);
-  double good = fabs(da) < 1; // only accelerate if pushing in the right direction
-  angularSpeed = (da > 0.0 ? 1.0 : -1.0) * config.angularSpeed;
-  acceleration = (speed.length() > config.cruseSpeed  || !good) ? 0.0 : config.acceleration;
-  /*std::cerr << "target " << patrolPoint << " pos " << position
-  << " abr " << abadrep << " ta " << a << " a " << rotation
-  << " dp " << v << " da " << da << std::endl;
-  */
-
+  if (config.moving)
+  {
+    P2 v = patrolPoint - position;
+    double abadrep = atan2(-v.y, v.x); // reversed referrential, 0 is up-left
+    double a = simpleAngle(abadrep-M_PI/2.0);
+    double aSpeed = simpleAngle(atan2(-speed.y, speed.x)-M_PI/2.0);
+    
+    double da = deltaAngle(rotation, a);
+    double good = fabs(da) < 1; // only accelerate if pushing in the right direction
+    angularSpeed = (da > 0.0 ? 1.0 : -1.0) * config.angularSpeed;
+    acceleration = (speed.length() > config.cruseSpeed  || !good) ? 0.0 : config.acceleration;
+    /*std::cerr << "target " << patrolPoint << " pos " << position
+    << " abr " << abadrep << " ta " << a << " a " << rotation
+    << " dp " << v << " da " << da << std::endl;
+    */
+  }
   // fire control. Only one new shot per frame
   auto freeSlotsMask = freeWeaponSlots();
   if (shots.size() < weaponLocations[typeIndex()].size())
   {
     for (auto const& s: ships)
     {
-      if (&s->player == &player)
+      if (&s->player == &player || !s->config.moving)
         continue;
       for (int shift = 0; 1 << shift <= freeSlotsMask; ++shift)
       {
@@ -118,7 +120,7 @@ void Ship::think(std::vector<ShipPtr> const& ships, std::vector<Building*> const
           continue;
         auto wl = weaponLocations[typeIndex()][shift];
         auto awl = absolute(wl);
-        if ((awl-s->position).length() < 60.0)
+        if ((awl-s->position).length() < config.range)
         {
           fireAt(s, shift);
           break;
@@ -140,6 +142,9 @@ void Ship::think(std::vector<ShipPtr> const& ships, std::vector<Building*> const
         {
           shots.push_back(Laser{shift, nullptr, b, randomBuildingHitLocation(), now(), true});
           shots.back().pix = new QGraphicsLineItem();
+          shots.back().pix->setPen(QPen(
+            (player.flip()? QColor(70, 70, 255) : QColor(255, 255, 70))
+            ));
           player.game().scene().addItem(shots.back().pix);
           break;
         }

@@ -40,6 +40,8 @@ class Building
 {
 public:
   Building(Player& player, Asset asset);
+  virtual void activate() {}
+  virtual void destroyed() {}
   Asset assetType() { return _asset;}
   double hp = 200.0;
   double hpMax = 200.0;
@@ -104,6 +106,8 @@ struct ShipConfig
   double damage;
   double aimOptimal; // optimal max angular velocity: always hit below
   double aimMax; // max angular velocity: always miss above
+  double range;
+  bool moving = true;
 };
 
 class Ship
@@ -148,6 +152,7 @@ struct Config
   double buildingHp;
   double powerBonuses[4];
   double dupBonuses[5];
+  ShipConfig turret;
 };
 
 

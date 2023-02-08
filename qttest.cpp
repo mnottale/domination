@@ -129,6 +129,30 @@ public:
   virtual void onClick() = 0;
 };
 
+class BuildingTurret: public BuildingCore
+{
+public:
+  BuildingTurret(Player& player)
+  : BuildingCore(player, Asset::BuildingTurret)
+  {
+    weaponConfig = game().config.turret;
+  }
+  void onClick() override
+  {
+  }
+  void activate() override
+  {
+    weapon = std::make_shared<Ship>(weaponConfig, player(), Asset::ShipFighter, center);
+    game().addShip(weapon);
+  }
+  void destroyed() override
+  {
+    game().ships().erase(std::find(game().ships().begin(), game().ships().end(), weapon));
+  }
+private:
+  ShipConfig weaponConfig;
+  ShipPtr weapon;
+};
 class BuildingPowerGenerator: public BuildingCore
 {
 public:
@@ -578,6 +602,9 @@ void Player::placeBuilding(Asset type)
   case Asset::BuildingPowerGenerator:
     b = new BuildingPowerGenerator(*this);
     break;
+  case Asset::BuildingTurret:
+    b = new BuildingTurret(*this);
+    break;
   default:
     throw std::runtime_error("cannot build this");
   }
@@ -637,15 +664,16 @@ void Game::setup(int w, int h)
 {
   config = Config
   {
-    {//time accel  speed aspd  hp     dmg  asopt asmax
-      {  8.0, 20.0, 60.0, 1.2,  30.0, 1.0, 2.0, 4.0 },
-      { 19.5, 15.0, 40.0, 1.0,  60.0, 1.0, 1.5, 3.0 },
-      { 38.0, 15.0, 30.0, 0.8, 120.0, 1.0, 0.2, 0.8 },
+    {//time accel  speed aspd  hp     dmg  asopt asmax range moving
+      {  8.0, 20.0, 60.0, 1.2,  30.0, 1.0, 2.0, 4.0, 60, true},
+      { 19.5, 15.0, 40.0, 1.0,  60.0, 1.0, 1.5, 3.0, 60, true},
+      { 38.0, 15.0, 30.0, 0.8, 120.0, 1.0, 0.2, 0.8, 60, true},
     },
     200.0,
     //bas turr miss ship powr
     {0.2, 0.3, 0.3, 0.2}, //power factory bonuses
     {0.3, 0.4, 0.4, 0.3, 0.3}, // dup bonuses
+    {8.0, 20.0, 60.0, 1.2,  30.0, 5.0, 3.0, 6.0, 90, false}, // turret
   };
   this->w = w;
   this->h = h;
@@ -691,30 +719,33 @@ void Game::update()
   {
     auto& s = *sptr;
     s.think(_ships, otherPlayer(s.player).buildings());
-    s.rotation += s.angularSpeed * elapsed;
-    s.speed.x += elapsed * s.acceleration * sin(s.rotation) * -1.0;
-    s.speed.y += elapsed * s.acceleration * cos(s.rotation) * -1.0;
-    float smag = s.speed.length();
-    P2 snorm = s.speed.normalize();
-    smag -= sgn(smag) * std::min((double)smag, elapsed * 10.0);
-    s.speed = snorm * smag;
-    //s.speed.x -= sgn(s.speed.x) * std::min((double)fabs(s.speed.x), elapsed * 10.0);
-    //s.speed.y -= sgn(s.speed.y) * std::min((double)fabs(s.speed.y), elapsed * 10.0);
-    s.position.x += s.speed.x * elapsed;
-    s.position.y += s.speed.y * elapsed;
-    auto asz = assetSize[(int)s.shipType];
-    auto d = (double)asz * sqrt(2.0) / 2.0;
-    auto dx = d * sin(s.rotation + M_PI / 4.0);
-    auto dy = d * cos(s.rotation + M_PI / 4.0);
-    s.pix->setPos(s.position.x-dx, s.position.y-dy);
-    s.pix->setRotation(-s.rotation * 180.0 / M_PI);
+    if (s.config.moving)
+    {
+      s.rotation += s.angularSpeed * elapsed;
+      s.speed.x += elapsed * s.acceleration * sin(s.rotation) * -1.0;
+      s.speed.y += elapsed * s.acceleration * cos(s.rotation) * -1.0;
+      float smag = s.speed.length();
+      P2 snorm = s.speed.normalize();
+      smag -= sgn(smag) * std::min((double)smag, elapsed * 10.0);
+      s.speed = snorm * smag;
+      //s.speed.x -= sgn(s.speed.x) * std::min((double)fabs(s.speed.x), elapsed * 10.0);
+      //s.speed.y -= sgn(s.speed.y) * std::min((double)fabs(s.speed.y), elapsed * 10.0);
+      s.position.x += s.speed.x * elapsed;
+      s.position.y += s.speed.y * elapsed;
+      auto asz = assetSize[(int)s.shipType];
+      auto d = (double)asz * sqrt(2.0) / 2.0;
+      auto dx = d * sin(s.rotation + M_PI / 4.0);
+      auto dy = d * cos(s.rotation + M_PI / 4.0);
+      s.pix->setPos(s.position.x-dx, s.position.y-dy);
+      s.pix->setRotation(-s.rotation * 180.0 / M_PI);
+    }
     // shots timeout/out of range
     for (int i=0; i< s.shots.size(); ++i)
     {
       auto& shot = s.shots[i];
       P2 targetPos = shot.targetShip ? shot.targetShip->position : shot.targetBuilding->center;   
       if (now() - shot.start > std::chrono::seconds(1)
-        || (targetPos-s.absolute(Ship::weaponLocations[s.typeIndex()][shot.slot])).length() > 70.0)
+        || (targetPos-s.absolute(Ship::weaponLocations[s.typeIndex()][shot.slot])).length() > s.config.range*1.15)
       {
         scene().removeItem(shot.pix);
         delete shot.pix;
@@ -753,6 +784,7 @@ void Game::update()
     {
       _scene.removeItem(b->graphics);
       _scene.removeItem(b->healthBar);
+      b->destroyed();
     }
   }
   // remove dead ships
@@ -794,12 +826,14 @@ void Game::addBuilding(Building& b, int slot)
     b.center = P2{buildingSize*slot+buildingSize/2, h-buildingSize/2};
     b.healthBar->setPos(buildingSize*slot, h-4);
   }
+  b.activate();
 }
 
 void Game::addShip(ShipPtr ship)
 {
   _ships.push_back(ship);
-  _scene.addItem(ship->pix);
+  if (ship->config.moving)
+    _scene.addItem(ship->pix);
 }
 
 void Game::showMenu(QWidget* widget, bool flip)
