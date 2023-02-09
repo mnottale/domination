@@ -67,10 +67,12 @@ public:
   void showMenu(QWidget* widget);
   void showPlayerMenu();
   void moveShips(int to);
+  void setWaypoint(int to);
   Game& game() { return _game;}
   const std::vector<Building*> buildings() { return _buildings;}
   double powerFactors[4] = {1,1,1,1};
   int countOf[5] = {0,0,0,0,0};
+  P2 waypoint = {50, 50};
 protected:
   Game& _game;
   std::vector<Building*> _buildings;

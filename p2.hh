@@ -2,7 +2,7 @@
 #include <iostream>
 #include <math.h>
 
-inline float sq(float v)
+inline double sq(double v)
 {
   return v*v;
 }
@@ -10,20 +10,20 @@ inline float sq(float v)
 class P2
 {
 public:
-  float x;
-  float y;
+  double x;
+  double y;
   P2() : x(0), y(0) {}
-  P2(float x_, float y_) : x(x_), y(y_) {}
-  float length() const { return std::sqrt(x*x + y*y);}
+  P2(double x_, double y_) : x(x_), y(y_) {}
+  double length() const { return std::sqrt(x*x + y*y);}
   P2 normalize() const; 
   P2 rotate90() const {
     return P2{y, -x};
   }
-  float dot(P2 const& b) const {
+  double dot(P2 const& b) const {
     return x*b.x + y*b.y;
   }
   P2 bounce(P2 const& axis) const;
-  P2 aclamp(float v) const {
+  P2 aclamp(double v) const {
     return P2{
       std::max(std::min(v, x), -v),
       std::max(std::min(v, y), -v)
@@ -46,10 +46,10 @@ inline P2 operator - (P2 const& a, P2 const& b) {
   return P2{a.x-b.x, a.y-b.y};
 }
 
-inline P2 operator * (P2 const& a, float f) {
+inline P2 operator * (P2 const& a, double f) {
   return P2{a.x*f, a.y*f};
 }
-inline P2 operator / (P2 const& a, float f) {
+inline P2 operator / (P2 const& a, double f) {
   return P2{a.x/f, a.y/f};
 }
 

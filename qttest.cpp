@@ -147,8 +147,13 @@ public:
     delete _timer;
     _timer = nullptr;
     double gh = game().h;
-    double tx = ((double)(to/5) + 0.5)/6.0 * gh;
-    double ty = ((double)(to%5) + 0.5)/6.0 * gh;
+    double tx = ((double)(to/5) + 0.5)/5.0 * gh;
+    double ty = ((double)(to%5) + 0.5)/5.0 * gh;
+    if (_flip)
+    {
+      tx = game().h-tx;
+      ty = game().h-ty;
+    }
     auto ship = std::make_shared<Ship>(game().config.ships[(int)Asset::MissileEMP], player(), Asset::MissileEMP, center);
     ship->patrolPoint = ship->destination = P2{tx, ty};
     game().addShip(ship);
@@ -352,7 +357,7 @@ public:
   void make(QLayout* layout, Asset what)
   {
     auto* b = new ClickablePushButton([this, what] { enqueue(what);});
-    b->setIcon(QIcon(game().getAsset(what)));
+    b->setIcon(QIcon(game().getAsset(what, player().flip())));
     b->setIconSize(QSize(Game::buildingSize/2, Game::buildingSize/2));
     layout->addWidget(b);
   }
@@ -582,7 +587,9 @@ Player::Player(Game& game, bool flip)
 : _game(game)
 , _flip(flip)
 {
+  waypoint = P2{_game.h/2 + (rand()%50)-25, _flip? 120 : _game.h - 120};
 }
+
 Game& Building::game() {return _player.game();}
 
 void Player::showMenu(QWidget* widget)
@@ -596,6 +603,21 @@ void Player::showMenu(QWidget* widget)
     _current = widget;
     _game.showMenu(widget, _flip);
   }
+}
+
+void Player::setWaypoint(int to)
+{
+  double gh = game().h;
+  double tx = ((double)(to/5) + 0.5)/5.0 * gh;
+  double ty = ((double)(to%5) + 0.5)/5.0 * gh;
+  if (_flip)
+  {
+    tx = game().h-tx;
+    ty = game().h-ty;
+  }
+  P2 tgt{tx,ty};
+  waypoint = tgt;
+  std::cerr << "waypoint set to " << tx << " " << ty << std::endl;
 }
 
 void Player::showPlayerMenu()
@@ -645,23 +667,31 @@ void Player::showPlayerMenu()
     _tabs = tw;
     layout->addWidget(tw);
     //layout->addWidget(new QLabel("move to"));
-    auto* quad = new QGroupBox("");
-    quad->setMaximumWidth(180);
-    auto* ql = new QGridLayout();
-    ql->setHorizontalSpacing(1);
-    ql->setVerticalSpacing(1);
-    const int SZ = 5;
-    for (int i=0; i <SZ*SZ;++i)
+    tw = new QTabWidget();
+    tw->setMaximumWidth(200);
+    for (int w=0; w<2; w++)
     {
-      auto* b = new ClickablePushButton([this, idx=i]{moveShips(idx);});
-      b->setText("x");
-      b->setMinimumWidth(20);
-      b->setMinimumHeight(20);
-      b->setMaximumHeight(100);
-      ql->addWidget(b, i%SZ, i/SZ);
+      auto* quad = new QGroupBox("");
+      quad->setMaximumWidth(180);
+      auto* ql = new QGridLayout();
+      ql->setHorizontalSpacing(1);
+      ql->setVerticalSpacing(1);
+      const int SZ = 5;
+      for (int i=0; i <SZ*SZ;++i)
+      {
+        auto* b = new ClickablePushButton(
+          w? (Callback)[this, idx=i]{setWaypoint(idx);}
+          : (Callback)[this, idx=i]{moveShips(idx);});
+        b->setText("x");
+        b->setMinimumWidth(20);
+        b->setMinimumHeight(20);
+        b->setMaximumHeight(100);
+        ql->addWidget(b, i%SZ, i/SZ);
+      }
+      quad->setLayout(ql);
+      tw->addTab(quad, w? "waypoint" : "move");
     }
-    quad->setLayout(ql);
-    layout->addWidget(quad);
+    layout->addWidget(tw);
     groupBox->setLayout(layout);
     _menu = groupBox;
   }
@@ -680,8 +710,8 @@ double clamp(double v, double min, double max)
 void Player::moveShips(int to)
 {
   double gh = game().h;
-  double tx = ((double)(to/5) + 0.5)/6.0 * gh;
-  double ty = ((double)(to%5) + 0.5)/6.0 * gh;
+  double tx = ((double)(to/5) + 0.5)/5.0 * gh;
+  double ty = ((double)(to%5) + 0.5)/5.0 * gh;
   if (_flip)
   {
     tx = game().h-tx;
@@ -749,6 +779,7 @@ void Player::placeShip(Asset type)
     *this, type,
     P2{game().h/2 + (rand()%50)-25, _flip? 120 : game().h - 120}
     );
+  s->patrolPoint = s->destination = waypoint;
   _game.addShip(s);
 }
 static std::string assetName[] = {
@@ -830,7 +861,7 @@ void Game::run(QApplication& app)
   auto* t = new QTimer();
   t->connect(t, &QTimer::timeout,
       std::bind(&Game::update, this));
-  t->start(50);
+  t->start(10);
   _lastUpdate = now();
   app.exec();
 }
@@ -1001,6 +1032,7 @@ Ship::Ship(ShipConfig const& config, Player& p, Asset st, P2 pos)
 : position(pos), shipType(st), player(p), config(config)
 {
   hp = config.hp;
+  destination = pos;
   patrolPoint = destination + P2{rand()%160-80, rand()%160-80};
   pix = new QGraphicsPixmapItem(p.game().getAsset(st, p.flip()));
 }
