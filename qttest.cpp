@@ -129,6 +129,108 @@ public:
   virtual void onClick() = 0;
 };
 
+class BuildingMissileLauncher: public BuildingCore
+{
+public:
+  BuildingMissileLauncher(Player& player)
+  : BuildingCore(player, Asset::BuildingMissileLauncher)
+  {
+  }
+  void activate() override
+  {
+  }
+  void launch(int to)
+  {
+    if (_progress->value()<1000)
+      return;
+    _progress->setValue(0);
+    delete _timer;
+    _timer = nullptr;
+    double gh = game().h;
+    double tx = ((double)(to/5) + 0.5)/6.0 * gh;
+    double ty = ((double)(to%5) + 0.5)/6.0 * gh;
+    auto ship = std::make_shared<Ship>(game().config.ships[(int)Asset::MissileEMP], player(), Asset::MissileEMP, center);
+    ship->patrolPoint = ship->destination = P2{tx, ty};
+    game().addShip(ship);
+  }
+  void updateProduction()
+  {
+    auto elapsed = now() - _productionStart;
+    typedef std::chrono::duration<float> float_seconds;
+    auto secs = std::chrono::duration_cast<float_seconds>(elapsed).count();
+    int bidx = buildingIndex(Asset::BuildingMissileLauncher);
+    auto buildTime = 30.0
+      * player().powerFactors[bidx]
+      * pow(1.0 - game().config.dupBonuses[bidx], player().countOf[bidx]-1);
+    _progress->setValue(std::min(secs * 1000.0 / buildTime, 1000.0));
+    if (_progress->value() >= 1000)
+      _timer->stop();
+  }
+  void enqueue(Asset what)
+  {
+    if (_timer != nullptr)
+      return;
+    _productionStart = now();
+    _timer = new QTimer();
+    _timer->connect(_timer, &QTimer::timeout, std::bind(&BuildingMissileLauncher::updateProduction, this));
+    _timer->start(50);
+  }
+  void make(QLayout* layout, Asset what)
+  {
+    auto* b = new ClickablePushButton([this, what] { enqueue(what);});
+    b->setIcon(QIcon(game().getAsset(what)));
+    b->setIconSize(QSize(Game::buildingSize/2, Game::buildingSize/2));
+    layout->addWidget(b);
+  }
+  void onClick() override
+  {
+    if (_menu == nullptr)
+    {
+      QGroupBox *groupBox = new QGroupBox("Missile launcher");
+      QBoxLayout *layout = new QBoxLayout(QBoxLayout::TopToBottom);
+      layout->addWidget(new QLabel("currently producing"));
+      QPushButton *button = new QPushButton;
+      button->setIcon(QIcon::fromTheme("call-stop"));
+      button->setIconSize(QSize(Game::buildingSize/2, Game::buildingSize/2));
+      layout->addWidget(button);
+      _producingButton = button;
+      auto* bar = new QProgressBar();
+      bar->setMinimum(0);
+      bar->setMaximum(1000);
+      layout->addWidget(bar);
+      _progress = bar;
+      layout->addWidget(new QLabel("start production:"));
+      make(layout, Asset::MissileEMP);
+      layout->addWidget(new QLabel("Launch missile"));
+      auto* quad = new QGroupBox("");
+      quad->setMaximumWidth(180);
+      auto* ql = new QGridLayout();
+      ql->setHorizontalSpacing(1);
+      ql->setVerticalSpacing(1);
+      const int SZ = 5;
+      for (int i=0; i <SZ*SZ;++i)
+      {
+        auto* b = new ClickablePushButton([this, idx=i]{launch(idx);});
+        b->setText("x");
+        b->setMinimumWidth(20);
+        b->setMinimumHeight(20);
+        b->setMaximumHeight(100);
+        ql->addWidget(b, i%SZ, i/SZ);
+      }
+      quad->setLayout(ql);
+      layout->addWidget(quad);
+      groupBox->setLayout(layout);
+      _menu = groupBox;
+    }
+    player().showMenu(_menu);
+  }
+private:
+  QPushButton* _producingButton;
+  QProgressBar* _progress;
+  QWidget* _menu = nullptr;
+  QTimer* _timer = nullptr;
+  Time _productionStart;
+};
 class BuildingTurret: public BuildingCore
 {
 public:
@@ -624,6 +726,9 @@ void Player::placeBuilding(Asset type)
   case Asset::BuildingTurret:
     b = new BuildingTurret(*this);
     break;
+  case Asset::BuildingMissileLauncher:
+    b = new BuildingMissileLauncher(*this);
+    break;
   default:
     throw std::runtime_error("cannot build this");
   }
@@ -644,6 +749,7 @@ static std::string assetName[] = {
   "ship_fighter*.png",
   "ship_frigate*.png",
   "ship_cruiser*.png",
+  "missile_emp.png",
   "building_base.png",
   "building_turret.png",
   "building_missilelauncher.png",
@@ -687,11 +793,12 @@ void Game::setup(int w, int h)
       {  8.0, 20.0, 60.0, 1.2,  30.0, 1.0, 2.0, 4.0, 60, true},
       { 19.5, 15.0, 40.0, 1.0,  60.0, 1.0, 1.5, 3.0, 60, true},
       { 38.0, 15.0, 30.0, 0.8, 120.0, 1.0, 0.2, 0.8, 60, true},
+      { 15.0, 40.0, 150.0, 2.0, 120.0, 13.0, 0.2, 0.8, 200, true},
     },
     200.0,
     //bas turr miss ship powr
     {0.2, 0.3, 0.3, 0.2}, //power factory bonuses
-    {0.3, 0.4, 0.4, 0.3, 0.3}, // dup bonuses
+    {0.3, 0.4, 0.8, 0.3, 0.3}, // dup bonuses
     {8.0, 20.0, 60.0, 1.2,  30.0, 5.0, 3.0, 6.0, 90, false}, // turret
   };
   this->w = w;
@@ -737,7 +844,13 @@ void Game::update()
   for (auto& sptr: _ships)
   {
     auto& s = *sptr;
-    s.think(_ships, otherPlayer(s.player).buildings());
+    if (s.jammedUntil > now())
+    {
+      s.angularSpeed = 0;
+      s.acceleration = 0;
+    }
+    else
+      s.think(_ships, otherPlayer(s.player).buildings());
     if (s.config.moving)
     {
       s.rotation += s.angularSpeed * elapsed;
@@ -911,5 +1024,6 @@ P2 Ship::absolute(P2 pointOnShip)
 std::vector<std::vector<P2>> Ship::weaponLocations = {
 {{0, -5}},
 {{-8, -4}, {8, -4}},
-{{-20, -11}, {20, -11}, {-20, 7}, { 20, 7}}
+{{-20, -11}, {20, -11}, {-20, 7}, { 20, 7}},
+{}
 };

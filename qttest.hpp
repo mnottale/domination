@@ -21,6 +21,7 @@ enum class Asset
   ShipFighter,
   ShipFrigate,
   ShipCruiser,
+  MissileEMP,
   BuildingBase,
   BuildingTurret,
   BuildingMissileLauncher,
@@ -128,6 +129,7 @@ public:
   P2 speed = {0.0,0.0};
   std::vector<Laser> shots;
   double hp = 50.0;
+  Time jammedUntil;
   //control
   double acceleration = 0.0;
   double angularSpeed = 0.0;
@@ -148,7 +150,7 @@ public:
 
 struct Config
 {
-  ShipConfig ships[3];
+  ShipConfig ships[4];
   double buildingHp;
   double powerBonuses[4];
   double dupBonuses[5];

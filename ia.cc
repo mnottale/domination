@@ -83,10 +83,35 @@ void Ship::fireAt(ShipPtr target, int weaponSlot)
   //player.screen().recordShot(typeIndex(), hit);
 }
 
+void dealFreezeDamage(std::vector<ShipPtr> const& ships, Player& player, P2 position, double range, double time)
+{
+  for (auto& ship: ships)
+  {
+    if (&ship->player == &player)
+      continue;
+    if ((position-ship->position).length() > range)
+      continue;
+    ship->jammedUntil = now() + std::chrono::milliseconds((long)(time* 1000.0));
+    for (auto& shot: ship->shots)
+    {
+      player.game().scene().removeItem(shot.pix);
+      delete shot.pix;
+    }
+    ship->shots.clear();
+  }
+}
+
 void Ship::think(std::vector<ShipPtr> const& ships, std::vector<Building*> const& buildings)
 {
   if ((position-patrolPoint).length() < 10.0f)
   { // generate new patrolpoint
+    if (shipType == Asset::MissileEMP)
+    {
+      // blow up
+      hp = -1.0;
+      dealFreezeDamage(ships, player, position, config.range, config.damage);
+      return;
+    }
     P2 delta{rand()%160-80, rand()%160-80};
     patrolPoint = destination - delta;
   }
@@ -138,7 +163,7 @@ void Ship::think(std::vector<ShipPtr> const& ships, std::vector<Building*> const
           continue;
         auto wl = weaponLocations[typeIndex()][shift];
         auto awl = absolute(wl);
-        if ((awl-b->center).length() < 60.0)
+        if ((awl-b->center).length() < config.range)
         {
           shots.push_back(Laser{shift, nullptr, b, randomBuildingHitLocation(), now(), true});
           shots.back().pix = new QGraphicsLineItem();
