@@ -114,7 +114,8 @@ void Ship::think(std::vector<ShipPtr> const& ships, std::vector<Building*> const
       dealFreezeDamage(ships, player, position, config.range, config.damage);
       return;
     }
-    P2 delta{rand()%160-80, rand()%160-80};
+    auto spread = (int)player.spread;
+    P2 delta{rand()%spread-spread/2, rand()%spread-spread/2};
     patrolPoint = destination - delta;
   }
   if (config.moving)

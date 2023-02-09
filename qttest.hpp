@@ -73,6 +73,7 @@ public:
   double powerFactors[4] = {1,1,1,1};
   int countOf[5] = {0,0,0,0,0};
   P2 waypoint = {50, 50};
+  double spread;
 protected:
   Game& _game;
   std::vector<Building*> _buildings;
@@ -173,7 +174,7 @@ public:
   void addShip(ShipPtr ship);
   Player& otherPlayer(Player const& p);
   QPixmap& getAsset(Asset asset, bool flip=false);
-  std::vector<ShipPtr> ships() { return _ships;}
+  std::vector<ShipPtr>& ships() { return _ships;}
   int w, h;
   Config config;
   QGraphicsScene& scene() { return _scene;}

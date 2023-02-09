@@ -149,7 +149,7 @@ public:
     double gh = game().h;
     double tx = ((double)(to/5) + 0.5)/5.0 * gh;
     double ty = ((double)(to%5) + 0.5)/5.0 * gh;
-    if (_flip)
+    if (player().flip())
     {
       tx = game().h-tx;
       ty = game().h-ty;
@@ -270,7 +270,16 @@ public:
   }
   void destroyed() override
   {
-    game().ships().erase(std::find(game().ships().begin(), game().ships().end(), weapon));
+    auto& ships = game().ships();
+    auto it = std::find(ships.begin(), ships.end(), weapon);
+    if (it != ships.end())
+    {
+      int idx = it - ships.begin();
+      std::swap(ships[idx], ships[ships.size()-1]);
+      ships.pop_back();
+    }
+    //std::erase(game().ships(), weapon);
+    //game().ships().erase(std::find(game().ships().begin(), game().ships().end(), weapon));
     _timer->stop();
   }
 private:
@@ -588,6 +597,7 @@ Player::Player(Game& game, bool flip)
 , _flip(flip)
 {
   waypoint = P2{_game.h/2 + (rand()%50)-25, _flip? 120 : _game.h - 120};
+  spread = _game.h/5;
 }
 
 Game& Building::game() {return _player.game();}
@@ -689,8 +699,14 @@ void Player::showPlayerMenu()
         ql->addWidget(b, i%SZ, i/SZ);
       }
       quad->setLayout(ql);
-      tw->addTab(quad, w? "waypoint" : "move");
+      tw->addTab(quad, w? "WP" : "move");
     }
+    auto* slspread = new QSlider(Qt::Vertical);
+    slspread->setMinimum(game().h/20);
+    slspread->setMaximum(game().h/4);
+    slspread->setValue(game().h/5);
+    slspread->connect(slspread, &QSlider::valueChanged, [this](int v){this->spread = v;});
+    tw->addTab(slspread, "SPRD");
     layout->addWidget(tw);
     groupBox->setLayout(layout);
     _menu = groupBox;
