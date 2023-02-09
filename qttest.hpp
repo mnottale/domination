@@ -155,6 +155,7 @@ struct Config
   double powerBonuses[4];
   double dupBonuses[5];
   ShipConfig turret;
+  double buildingBuildTime[5];
 };
 
 

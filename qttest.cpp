@@ -487,7 +487,13 @@ public:
   void updateProduction()
   {
     auto elapsed = now() - _productionStart;
-    if (elapsed > std::chrono::seconds(10))
+    typedef std::chrono::duration<float> float_seconds;
+    auto secs = std::chrono::duration_cast<float_seconds>(elapsed).count();
+    int bidx = buildingIndex(Asset::BuildingBase);
+    auto buildTime = game().config.buildingBuildTime[(int)_producing-(int)Asset::BuildingBase]
+     * player().powerFactors[bidx]
+     * pow(1.0 - game().config.dupBonuses[bidx], player().countOf[bidx]-1);
+    if (secs > buildTime)
     {
       _producingButton->setIcon(QIcon::fromTheme("call-stop"));
       _timer->stop();
@@ -500,7 +506,7 @@ public:
     {
       typedef std::chrono::duration<float> float_seconds;
       auto secs = std::chrono::duration_cast<float_seconds>(elapsed).count();
-      _progress->setValue(secs * 1000.0 / 10.0);
+      _progress->setValue(secs * 1000.0 / buildTime);
     }
   }
   void startProduction(Asset what)
@@ -800,6 +806,8 @@ void Game::setup(int w, int h)
     {0.2, 0.3, 0.3, 0.2}, //power factory bonuses
     {0.3, 0.4, 0.8, 0.3, 0.3}, // dup bonuses
     {8.0, 20.0, 60.0, 1.2,  30.0, 5.0, 3.0, 6.0, 90, false}, // turret
+    //build time
+    {60, 40, 40, 50, 40},
   };
   this->w = w;
   this->h = h;

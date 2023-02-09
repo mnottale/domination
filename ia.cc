@@ -36,6 +36,8 @@ static P2 randomHitLocation(Ship const& target)
     return P2{rand()%30 - 15, rand()%40 - 20};
   case Asset::ShipCruiser:
     return P2{rand()%16 - 8, rand()%50 - 25};
+  case Asset::MissileEMP:
+    return P2{rand()%10, rand()%30 - 15};
   }
 }
 
