@@ -73,6 +73,39 @@ int main(int argc, char **argv)
     */
 }
 using Callback = std::function<void()>;
+class ManagedAnimation: public QGraphicsPixmapItem
+{
+public:
+  ManagedAnimation(Game& game, AnimatedAsset asset, int frameTimeMs, double scale)
+  :QGraphicsPixmapItem(*game.getAnimatedAsset(asset)[0])
+  , _game(game)
+  , _a(game.getAnimatedAsset(asset))
+  {
+    setScale(scale);
+    _timer = new QTimer();
+    _timer->connect(_timer, &QTimer::timeout, std::bind(&ManagedAnimation::onTimer, this));
+    _timer->setInterval(frameTimeMs);
+    _timer->start();
+  }
+  void onTimer()
+  {
+    ++_idx;
+    if (_idx >= _a.size())
+    {
+      _timer->stop();
+      delete _timer;
+      _game.scene().removeItem(this);
+      delete this;
+      return;
+    }
+    setPixmap(*_a[_idx]);
+  }
+private:
+  Game& _game;
+  const std::vector<QPixmap*>& _a;
+  QTimer* _timer;
+  int _idx;
+};
 class ClickablePixmap: public QGraphicsPixmapItem
 {
 public:
@@ -809,6 +842,16 @@ static std::string assetName[] = {
   "building_shipyard.png",
   "building_powergenerator.png",
 };
+struct AnimatedAssetNames
+{
+  std::string pattern;
+  int start;
+  int end;
+};
+
+AnimatedAssetNames animatedAssetNames[] = {
+  {"explosion/explosion-%02d.png", 1, 50},
+};
 void Game::loadAssets()
 {
   for (int i=0; i<(int)Asset::AssetEnd; ++i)
@@ -824,6 +867,17 @@ void Game::loadAssets()
       auto y = name.substr(0, star) + "_yellow" + name.substr(star+1);
       _assetTextures.back().push_back(new QPixmap(("assets/" + b).c_str()));
       _assetTextures.back().push_back(new QPixmap(("assets/" + y).c_str()));
+    }
+  }
+  for (int i=0; i<(int)AnimatedAsset::AssetEnd; ++i)
+  {
+    char an[1024];
+    auto& a = animatedAssetNames[i];
+    _animatedAssets.emplace_back();
+    for (int x = a.start; x < a.end; x++)
+    {
+      snprintf(an, 1024, ("assets/"+a.pattern).c_str(), x);
+      _animatedAssets.back().push_back(new QPixmap(an));
     }
   }
 }
@@ -972,6 +1026,7 @@ void Game::update()
       _scene.removeItem(b->graphics);
       _scene.removeItem(b->healthBar);
       b->destroyed();
+      b->dead = true;
     }
   }
   // remove dead ships
@@ -985,10 +1040,18 @@ void Game::update()
         delete shot.pix;
       }
       _scene.removeItem(_ships[i]->pix);
+      auto* ma = new ManagedAnimation(*this, AnimatedAsset::Explosion, 14, (double)assetSize[(int)_ships[i]->shipType]/200.0);
+      ma->setPos(_ships[i]->pix->pos());
+      _scene.addItem(ma);
       std::swap(_ships[i], _ships[_ships.size()-1]);
       _ships.pop_back(); // todo: dramatic explosion
     }
   }
+}
+
+std::vector<QPixmap*>const& Game::getAnimatedAsset(AnimatedAsset asset)
+{
+  return _animatedAssets[(int)asset];
 }
 
 void Game::addBuilding(Building& b, int slot)
@@ -1051,6 +1114,7 @@ Ship::Ship(ShipConfig const& config, Player& p, Asset st, P2 pos)
   destination = pos;
   patrolPoint = destination + P2{rand()%160-80, rand()%160-80};
   pix = new QGraphicsPixmapItem(p.game().getAsset(st, p.flip()));
+  pix->setZValue(10);
 }
 
 int Ship::freeWeaponSlots()

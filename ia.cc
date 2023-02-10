@@ -160,6 +160,8 @@ void Ship::think(std::vector<ShipPtr> const& ships, std::vector<Building*> const
   {
     for (auto const& b: buildings)
     {
+      if (b->dead)
+        continue;
       for (int shift = 0; 1 << shift <= freeSlotsMask; ++shift)
       {
         if (((1 << shift) & freeSlotsMask) == 0)

@@ -30,6 +30,12 @@ enum class Asset
   AssetEnd,
 };
 
+enum class AnimatedAsset
+{
+  Explosion,
+  AssetEnd,
+};
+
 inline int buildingIndex(Asset a)
 {
   return (int)a - (int)Asset::BuildingBase;
@@ -51,6 +57,7 @@ public:
   Player& player() {return _player;}
   Game& game();
   P2 center;
+  bool dead = false;
 protected:
   Player& _player;
   Asset _asset;
@@ -174,6 +181,7 @@ public:
   void addShip(ShipPtr ship);
   Player& otherPlayer(Player const& p);
   QPixmap& getAsset(Asset asset, bool flip=false);
+  std::vector<QPixmap*> const& getAnimatedAsset(AnimatedAsset asset);
   std::vector<ShipPtr>& ships() { return _ships;}
   int w, h;
   Config config;
@@ -183,6 +191,7 @@ public:
 private:
   void loadAssets();
   std::vector<std::vector<QPixmap*>> _assetTextures;
+  std::vector<std::vector<QPixmap*>> _animatedAssets;
   QGraphicsScene _scene;
   QGraphicsProxyWidget* _menus[2] = {nullptr, nullptr};
   std::vector<ShipPtr> _ships;
