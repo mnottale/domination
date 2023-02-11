@@ -27,6 +27,7 @@ enum class Asset
   BuildingMissileLauncher,
   BuildingShipYard,
   BuildingPowerGenerator,
+  Exclamation,
   AssetEnd,
 };
 
@@ -47,7 +48,7 @@ class Building
 {
 public:
   Building(Player& player, Asset asset);
-  virtual void activate() {}
+  virtual void activate();
   virtual void destroyed() {}
   Asset assetType() { return _asset;}
   double hp = 200.0;
@@ -58,7 +59,10 @@ public:
   Game& game();
   P2 center;
   bool dead = false;
+  void setWarning(bool enabled);
 protected:
+  bool _exclOn = false;
+  QGraphicsItem* _excl;
   Player& _player;
   Asset _asset;
 };

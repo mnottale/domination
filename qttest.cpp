@@ -138,6 +138,24 @@ private:
   Callback _onClick;
 };
 
+void Building::activate()
+{
+  _excl->setPos(graphics->pos());
+  _excl->setRotation(graphics->rotation());
+  _excl->setZValue(3);
+}
+
+void Building::setWarning(bool enabled)
+{
+  if (enabled == _exclOn)
+    return;
+  if (enabled)
+    game().scene().addItem(_excl);
+  else
+    game().scene().removeItem(_excl);
+  _exclOn = enabled;
+}
+
 class BuildingCore: public Building
 {
 public:
@@ -167,9 +185,6 @@ class BuildingMissileLauncher: public BuildingCore
 public:
   BuildingMissileLauncher(Player& player)
   : BuildingCore(player, Asset::BuildingMissileLauncher)
-  {
-  }
-  void activate() override
   {
   }
   void launch(int to)
@@ -202,7 +217,10 @@ public:
       * pow(1.0 - game().config.dupBonuses[bidx], player().countOf[bidx]-1);
     _progress->setValue(std::min(secs * 1000.0 / buildTime, 1000.0));
     if (_progress->value() >= 1000)
+    {
+      setWarning(true);
       _timer->stop();
+    }
   }
   void enqueue(Asset what)
   {
@@ -212,6 +230,7 @@ public:
     _timer = new QTimer();
     _timer->connect(_timer, &QTimer::timeout, std::bind(&BuildingMissileLauncher::updateProduction, this));
     _timer->start(50);
+    setWarning(false);
   }
   void make(QLayout* layout, Asset what)
   {
@@ -286,6 +305,7 @@ public:
   }
   void activate() override
   {
+    BuildingCore::activate();
     weapon = std::make_shared<Ship>(weaponConfig, player(), Asset::ShipFighter, center);
     game().addShip(weapon);
   }
@@ -447,6 +467,7 @@ public:
         delete _timer;
         _timer = nullptr;
         _producing = Asset::AssetEnd;
+        setWarning(true);
       }
       else
       {
@@ -465,7 +486,10 @@ public:
   void enqueue(Asset what)
   {
     if (_producing == Asset::AssetEnd)
+    {
       startProducing(what);
+      setWarning(false);
+    }
     else if (_queue.size() < 16)
     {
       _queue.push_back(what);
@@ -623,7 +647,9 @@ private:
 Building::Building(Player& player, Asset asset)
 : _player(player)
 , _asset(asset)
-{}
+{
+  _excl = new QGraphicsPixmapItem(player.game().getAsset(Asset::Exclamation));
+}
 
 Player::Player(Game& game, bool flip)
 : _game(game)
@@ -841,6 +867,7 @@ static std::string assetName[] = {
   "building_missilelauncher.png",
   "building_shipyard.png",
   "building_powergenerator.png",
+  "exclamation.png",
 };
 struct AnimatedAssetNames
 {
@@ -1023,6 +1050,10 @@ void Game::update()
     b->healthBar->setRect(0,0,b->hp/b->hpMax * (double)buildingSize, 4);
     if (b->hp <= 0)
     {
+      auto* ma = new ManagedAnimation(*this, AnimatedAsset::Explosion, 14, (double)buildingSize/200.0);
+      ma->setPos(b->graphics->pos());
+      ma->setRotation(b->graphics->rotation());
+      _scene.addItem(ma);
       _scene.removeItem(b->graphics);
       _scene.removeItem(b->healthBar);
       b->destroyed();
@@ -1042,6 +1073,7 @@ void Game::update()
       _scene.removeItem(_ships[i]->pix);
       auto* ma = new ManagedAnimation(*this, AnimatedAsset::Explosion, 14, (double)assetSize[(int)_ships[i]->shipType]/200.0);
       ma->setPos(_ships[i]->pix->pos());
+      ma->setRotation(_ships[i]->pix->rotation());
       _scene.addItem(ma);
       std::swap(_ships[i], _ships[_ships.size()-1]);
       _ships.pop_back(); // todo: dramatic explosion
