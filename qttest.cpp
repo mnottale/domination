@@ -14,6 +14,8 @@
 #include <QSound>
 
 #include <set>
+#include <thread>
+#include <sstream>
 
 #include "qttest.hpp"
 
@@ -48,11 +50,30 @@ QWidget* make()
   groupBox->setLayout(layout);
   return groupBox;
 }
+void runDebugThread(QApplication& app, Game&game)
+{
+  QEventLoop el;
+  while (true)
+  {
+    std::string line;
+    std::getline(std::cin, line);
+    std::stringstream ss(line);
+    int side, kind, count;
+    ss >> side >> kind >> count;
+    QTimer::singleShot(0, &app, [side, kind, count,&game]()
+    {
+      for (int i=0; i<count;++i)
+        game.players[side]->placeShip((Asset)kind);
+    });
+  }
+}
 int main(int argc, char **argv)
 {
   QApplication app(argc, argv);
   Game g;
   g.setup(1600, 900);
+  std::thread dbgThread([&app,&g]() { runDebugThread(app,g);});
+  dbgThread.detach();
   g.run(app);
   
  /*
@@ -1052,7 +1073,7 @@ void Game::update()
   for(auto* b: hitBuilding)
   {
     b->healthBar->setRect(0,0,b->hp/b->hpMax * (double)buildingSize, 4);
-    if (b->hp <= 0)
+    if (b->hp <= 0 && !b->dead)
     {
       auto* ma = new ManagedAnimation(*this, AnimatedAsset::Explosion, 14, (double)buildingSize/200.0);
       ma->setPos(b->graphics->pos());
