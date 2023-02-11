@@ -11,6 +11,7 @@
 #include <QLabel>
 #include <QFormLayout>
 #include <QLineEdit>
+#include <QSound>
 
 #include <set>
 
@@ -219,6 +220,7 @@ public:
     if (_progress->value() >= 1000)
     {
       setWarning(true);
+      game().playSound(SoundAsset::MissileReady, player().flip());
       _timer->stop();
     }
   }
@@ -468,6 +470,7 @@ public:
         _timer = nullptr;
         _producing = Asset::AssetEnd;
         setWarning(true);
+        game().playSound(SoundAsset::ShipyardQueueComplete, player().flip());
       }
       else
       {
@@ -571,6 +574,7 @@ public:
       delete _timer;
       _timer = nullptr;
       _progress->setValue(0);
+      game().playSound(SoundAsset::BuildingComplete, player().flip());
       player().placeBuilding(_producing);
     }
     else
@@ -1058,6 +1062,7 @@ void Game::update()
       _scene.removeItem(b->healthBar);
       b->destroyed();
       b->dead = true;
+      playSound(SoundAsset::BuildingDestroyed, b->player().flip());
     }
   }
   // remove dead ships
@@ -1075,6 +1080,7 @@ void Game::update()
       ma->setPos(_ships[i]->pix->pos());
       ma->setRotation(_ships[i]->pix->rotation());
       _scene.addItem(ma);
+      playSound((SoundAsset)((int)SoundAsset::FighterDestroyed + (int)_ships[i]->shipType), _ships[i]->player.flip());
       std::swap(_ships[i], _ships[_ships.size()-1]);
       _ships.pop_back(); // todo: dramatic explosion
     }
@@ -1139,9 +1145,27 @@ void Game::showMenu(QWidget* widget, bool flip)
   }
 }
 
+void Game::playSound(SoundAsset asset, bool flip)
+{
+  static const std::string sounds[]=
+  {
+    "fighter_destroyed.wav",
+    "frigate_destroyed.wav",
+    "cruiser_destroyed.wav",
+    "building_destroyed.wav",
+    "building_complete.wav",
+    "shipyard_queue_complete.wav",
+    "missile_ready.wav",
+    "hostile_engaged.wav",
+  };
+  static const std::string voice[] = {"stephen_", "kimberly_"};
+  QSound::play((std::string("assets/") + voice[flip?1:0] + sounds[(int)asset]).c_str());
+}
 Ship::Ship(ShipConfig const& config, Player& p, Asset st, P2 pos)
 : position(pos), shipType(st), player(p), config(config)
 {
+  if (p.flip())
+    rotation = M_PI;
   hp = config.hp;
   destination = pos;
   patrolPoint = destination + P2{rand()%160-80, rand()%160-80};

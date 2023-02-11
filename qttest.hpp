@@ -30,6 +30,18 @@ enum class Asset
   Exclamation,
   AssetEnd,
 };
+enum class SoundAsset
+{
+  FighterDestroyed,
+  FrigateDestroyed,
+  CruiserDestroyed,
+  BuildingDestroyed,
+  BuildingComplete,
+  ShipyardQueueComplete,
+  MissileReady,
+  HostileEngaged,
+  AssetEnd,
+};
 
 enum class AnimatedAsset
 {
@@ -190,6 +202,7 @@ public:
   int w, h;
   Config config;
   QGraphicsScene& scene() { return _scene;}
+  void playSound(SoundAsset asset, bool flip);
   static const int buildingSize = 80;
   static const constexpr int assetSize[10] = {15, 30, 50, 80, 80, 80, 80, 80, 80, 80};
 private:
