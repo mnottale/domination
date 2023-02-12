@@ -739,28 +739,31 @@ void Player::showPlayerMenu()
   if (_menu == nullptr)
   {
     QGroupBox *groupBox = new QGroupBox("Move ships");
+    groupBox->setMinimumHeight(400);
     QBoxLayout *layout = new QBoxLayout(QBoxLayout::TopToBottom);
+    QBoxLayout *lh = new QBoxLayout(QBoxLayout::LeftToRight);
+    QBoxLayout *liv = new QBoxLayout(QBoxLayout::TopToBottom);
     //layout->addWidget(new QLabel("kind filter"));
-    auto* l = new QBoxLayout(QBoxLayout::LeftToRight);
+    auto* lbuttons = new QBoxLayout(QBoxLayout::LeftToRight);
     for (int i=0; i<3;i++)
     {
       auto* b = new QPushButton();
-      b->setIcon(QIcon(game().getAsset((Asset)i)));
+      b->setIcon(QIcon(game().getAsset((Asset)i, _flip)));
       b->setIconSize(QSize(Game::buildingSize/2, Game::buildingSize/2));
       b->setCheckable(true);
       _kinds[i] = b;
-      l->addWidget(b);
+      lbuttons->addWidget(b);
     }
-    layout->addLayout(l);
+    liv->addLayout(lbuttons);
     //layout->addWidget(new QLabel("zone filter"));
     auto* tw = new QTabWidget();
-    tw->setMaximumWidth(200);
+    tw->setMaximumWidth(300);
     tw->addTab(new QLabel("EVERYWHERE"), "all");
     for (int s=2; s <6; ++s)
     {
       _zones.emplace_back();
       auto* quad = new QGroupBox("");
-      quad->setMaximumWidth(180);
+      quad->setMaximumWidth(300);
       auto* ql = new QGridLayout();
       ql->setHorizontalSpacing(1);
       ql->setVerticalSpacing(1);
@@ -779,14 +782,15 @@ void Player::showPlayerMenu()
       tw->addTab(quad, std::to_string(s).c_str());
     }
     _tabs = tw;
-    layout->addWidget(tw);
+    liv->addWidget(tw);
+    lh->addLayout(liv);
     //layout->addWidget(new QLabel("move to"));
     tw = new QTabWidget();
-    tw->setMaximumWidth(200);
+    tw->setMaximumWidth(300);
     for (int w=0; w<2; w++)
     {
       auto* quad = new QGroupBox("");
-      quad->setMaximumWidth(180);
+      quad->setMaximumWidth(300);
       auto* ql = new QGridLayout();
       ql->setHorizontalSpacing(1);
       ql->setVerticalSpacing(1);
@@ -805,13 +809,14 @@ void Player::showPlayerMenu()
       quad->setLayout(ql);
       tw->addTab(quad, w? "WP" : "move");
     }
+    lh->addWidget(tw);
     auto* slspread = new QSlider(Qt::Vertical);
     slspread->setMinimum(game().h/20);
     slspread->setMaximum(game().h/4);
     slspread->setValue(game().h/5);
     slspread->connect(slspread, &QSlider::valueChanged, [this](int v){this->spread = v;});
-    tw->addTab(slspread, "SPRD");
-    layout->addWidget(tw);
+    lh->addWidget(slspread);
+    layout->addLayout(lh);
     groupBox->setLayout(layout);
     _menu = groupBox;
   }
@@ -999,6 +1004,7 @@ void Game::setup(int w, int h)
 void Game::run(QApplication& app)
 {
   QGraphicsView view(&_scene);
+  view.setSceneRect(0, 0, w, h);
   view.show();
   auto* t = new QTimer();
   t->connect(t, &QTimer::timeout,
