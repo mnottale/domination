@@ -53,18 +53,38 @@ QWidget* make()
 void runDebugThread(QApplication& app, Game&game)
 {
   QEventLoop el;
+  int side, kind, count;
+  int kinda, counta, kindb, countb;
   while (true)
   {
     std::string line;
     std::getline(std::cin, line);
     std::stringstream ss(line);
-    int side, kind, count;
-    ss >> side >> kind >> count;
-    QTimer::singleShot(0, &app, [side, kind, count,&game]()
+    std::string cmd;
+    ss >> cmd;
+    if (cmd == "s")
     {
-      for (int i=0; i<count;++i)
-        game.players[side]->placeShip((Asset)kind);
-    });
+      
+      ss >> side >> kind >> count;
+      QTimer::singleShot(0, &app, [side, kind, count,&game]()
+        {
+          for (int i=0; i<count;++i)
+            game.players[side]->placeShip((Asset)kind);
+        });
+    }
+    else if (cmd == "b")
+    {
+      ss >> kinda >> counta >> kindb >> countb;
+      QTimer::singleShot(0, &app, [&]()
+        {
+          for (int i=0; i<2;i++)
+            game.players[i]->setWaypoint(12);
+          for (int i=0; i<counta;++i)
+            game.players[0]->placeShip((Asset)kinda);
+          for (int i=0; i<countb;++i)
+            game.players[1]->placeShip((Asset)kindb);
+        });
+    }
   }
 }
 int main(int argc, char **argv)

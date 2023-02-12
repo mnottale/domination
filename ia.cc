@@ -105,7 +105,7 @@ void dealFreezeDamage(std::vector<ShipPtr> const& ships, Player& player, P2 posi
 
 void Ship::think(std::vector<ShipPtr> const& ships, std::vector<Building*> const& buildings)
 {
-  if ((position-patrolPoint).length() < 10.0f)
+  if ((position-patrolPoint).length() < (shipType == Asset::MissileEMP ? 20.0 : 10.0f))
   { // generate new patrolpoint
     if (shipType == Asset::MissileEMP)
     {
