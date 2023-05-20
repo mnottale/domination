@@ -7,6 +7,7 @@
 #include <QSlider>
 #include <QPushButton>
 #include <QTimer>
+#include <QWindow>
 #include <QProgressBar>
 #include <QLabel>
 #include <QFormLayout>
@@ -91,7 +92,7 @@ int main(int argc, char **argv)
 {
   QApplication app(argc, argv);
   Game g;
-  g.setup(1600, 900);
+  g.setup(3840, 2160, 2);
   std::thread dbgThread([&app,&g]() { runDebugThread(app,g);});
   dbgThread.detach();
   g.run(app);
@@ -969,7 +970,7 @@ QPixmap& Game::getAsset(Asset asset, bool flip)
     return *ts[flip ? 0 : 1];
 }
 
-void Game::setup(int w, int h)
+void Game::setup(int w, int h, double scale)
 {
   config = Config
   {
@@ -987,8 +988,9 @@ void Game::setup(int w, int h)
     //build time
     {60, 40, 40, 50, 40},
   };
-  this->w = w;
-  this->h = h;
+  this->w = w/scale;
+  this->h = h/scale;
+  this->scale = scale;
   loadAssets();
   players[0] = new Player(*this, false);
   players[1] = new Player(*this, true);
@@ -1004,8 +1006,14 @@ void Game::setup(int w, int h)
 void Game::run(QApplication& app)
 {
   QGraphicsView view(&_scene);
+  view.scale(scale,scale);
+  view.setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  view.setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   view.setSceneRect(0, 0, w, h);
   view.show();
+  view.windowHandle()->setPosition(0, 0);
+  view.resize(w*scale, h*scale);
+  view.showFullScreen();
   auto* t = new QTimer();
   t->connect(t, &QTimer::timeout,
       std::bind(&Game::update, this));
