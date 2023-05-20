@@ -471,7 +471,7 @@ public:
   void redrawQueue()
   {
     for (int i=0;i<_queue.size();++i)
-      _queueButtons[i]->setIcon(QIcon(game().getAsset(_queue[i])));
+      _queueButtons[i]->setIcon(QIcon(game().getAsset(_queue[i], player().flip())));
     for (int i=_queue.size(); i<16;++i)
       _queueButtons[i]->setIcon(QIcon::fromTheme("call-stop"));
   }
@@ -485,7 +485,7 @@ public:
   void startProducing(Asset what)
   {
     _producing = what;
-    _producingButton->setIcon(QIcon(game().getAsset(what)));
+    _producingButton->setIcon(QIcon(game().getAsset(what, player().flip())));
     _productionStart = now();
     _timer = new QTimer();
     _timer->connect(_timer, &QTimer::timeout,
@@ -518,7 +518,7 @@ public:
       else
       {
         _producing = _queue.front();
-        _producingButton->setIcon(QIcon(game().getAsset(_producing)));
+        _producingButton->setIcon(QIcon(game().getAsset(_producing, player().flip())));
         _queue.erase(_queue.begin());
         _productionStart = now();
         redrawQueue();
@@ -539,7 +539,7 @@ public:
     else if (_queue.size() < 16)
     {
       _queue.push_back(what);
-      _queueButtons[_queue.size()-1]->setIcon(QIcon(game().getAsset(what)));
+      _queueButtons[_queue.size()-1]->setIcon(QIcon(game().getAsset(what, _player.flip())));
     }
   }
   void onClick() override
