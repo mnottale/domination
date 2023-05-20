@@ -92,7 +92,8 @@ int main(int argc, char **argv)
 {
   QApplication app(argc, argv);
   Game g;
-  g.setup(3840, 2160, 2);
+  //g.setup(1920, 1080, 1, false);
+  g.setup(3840, 2160, 2, true);
   std::thread dbgThread([&app,&g]() { runDebugThread(app,g);});
   dbgThread.detach();
   g.run(app);
@@ -970,7 +971,7 @@ QPixmap& Game::getAsset(Asset asset, bool flip)
     return *ts[flip ? 0 : 1];
 }
 
-void Game::setup(int w, int h, double scale)
+void Game::setup(int w, int h, double scale, bool fullscreen)
 {
   config = Config
   {
@@ -991,6 +992,7 @@ void Game::setup(int w, int h, double scale)
   this->w = w/scale;
   this->h = h/scale;
   this->scale = scale;
+  this->fullscreen = fullscreen;
   loadAssets();
   players[0] = new Player(*this, false);
   players[1] = new Player(*this, true);
@@ -1013,7 +1015,8 @@ void Game::run(QApplication& app)
   view.show();
   view.windowHandle()->setPosition(0, 0);
   view.resize(w*scale, h*scale);
-  view.showFullScreen();
+  if (fullscreen)
+    view.showFullScreen();
   auto* t = new QTimer();
   t->connect(t, &QTimer::timeout,
       std::bind(&Game::update, this));

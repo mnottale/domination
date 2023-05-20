@@ -189,7 +189,7 @@ class Game
 {
 public:
   Player* players[2];
-  void setup(int w, int h, double scale);
+  void setup(int w, int h, double scale, bool fullscreen);
   void run(QApplication& app);
   void update();
   void showMenu(QWidget* widget, bool flip);
@@ -201,6 +201,7 @@ public:
   std::vector<ShipPtr>& ships() { return _ships;}
   int w, h;
   double scale;
+  bool fullscreen;
   Config config;
   QGraphicsScene& scene() { return _scene;}
   void playSound(SoundAsset asset, bool flip);
